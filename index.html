@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sussurros — Fofoca Anônima</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --surface3: #26262e;
+    --border: #2e2e38;
+    --accent: #c9a84c;
+    --accent2: #e8c96a;
+    --danger: #e05555;
+    --success: #4caf7d;
+    --text: #e8e6e0;
+    --text2: #9e9b94;
+    --text3: #5e5c58;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* NOISE TEXTURE */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.4;
+  }
+
+  /* SCREENS */
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* OFFLINE SCREEN */
+  #screen-offline {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+  }
+  .offline-icon { font-size: 64px; margin-bottom: 24px; }
+  .offline-title { font-family: 'Playfair Display', serif; font-size: 28px; color: var(--accent); margin-bottom: 12px; }
+  .offline-msg { color: var(--text2); max-width: 320px; }
+
+  /* ENTRY SCREEN */
+  #screen-entry {
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    background: radial-gradient(ellipse at 50% 0%, #1a1508 0%, var(--bg) 60%);
+  }
+  .entry-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    color: var(--accent);
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .entry-tagline {
+    color: var(--text2);
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .entry-card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    margin-bottom: 6px;
+  }
+  .entry-card p {
+    color: var(--text2);
+    font-size: 13px;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 8px;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px 20px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0d0f;
+    width: 100%;
+  }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { opacity: 0.85; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text2);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 8px 14px; font-size: 13px; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* MAIN APP */
+  #screen-app { flex-direction: row; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+  }
+  .sidebar-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    color: var(--accent);
+  }
+  .sidebar-user {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .sidebar-user-name { font-size: 14px; font-weight: 500; }
+  .sidebar-user-role { font-size: 11px; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; }
+
+  .sidebar-section {
+    padding: 16px 12px 8px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+  }
+  .group-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    margin: 0 8px;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .group-item:hover { background: var(--surface2); }
+  .group-item.active { background: var(--surface3); }
+  .group-item-icon { font-size: 18px; }
+  .group-item-name { font-size: 14px; flex: 1; }
+  .group-item-badge {
+    background: var(--accent);
+    color: #0d0d0f;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+  .group-item-lock { font-size: 12px; color: var(--text3); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sidebar-footer .btn { font-size: 13px; }
+
+  /* MAIN CONTENT */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* CHAT HEADER */
+  .chat-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .chat-header-info { flex: 1; }
+  .chat-header-name { font-family: 'Playfair Display', serif; font-size: 20px; }
+  .chat-header-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .chat-header-actions { display: flex; gap: 8px; }
+
+  /* MESSAGES */
+  .messages-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .message {
+    display: flex;
+    gap: 12px;
+    max-width: 680px;
+    animation: fadeUp 0.2s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .message.own { flex-direction: row-reverse; align-self: flex-end; }
+  .message-avatar { flex-shrink: 0; }
+  .message-bubble {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px 14px 14px 14px;
+    padding: 10px 14px;
+    max-width: 520px;
+  }
+  .message.own .message-bubble {
+    background: #1e1a0e;
+    border-color: #3a3010;
+    border-radius: 14px 4px 14px 14px;
+  }
+  .message-name { font-size: 12px; color: var(--accent); font-weight: 500; margin-bottom: 4px; }
+  .message-text { font-size: 14px; line-height: 1.6; word-break: break-word; }
+  .message-time { font-size: 11px; color: var(--text3); margin-top: 6px; }
+  .message-media { max-width: 300px; border-radius: 8px; margin-top: 6px; }
+  .message-media img { width: 100%; border-radius: 8px; cursor: pointer; }
+  .message-media video { width: 100%; border-radius: 8px; }
+  .message-media audio { width: 100%; margin-top: 4px; }
+  .message-deleted { font-style: italic; color: var(--text3); font-size: 13px; }
+  .admin-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .admin-delete-btn:hover { color: var(--danger); background: rgba(224,85,85,0.1); }
+
+  /* PENDING GROUP */
+  .pending-box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: var(--text2);
+    text-align: center;
+    padding: 40px;
+  }
+  .pending-box .icon { font-size: 48px; }
+  .pending-box h3 { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--text); }
+
+  /* INPUT AREA */
+  .input-area {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .input-box {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 12px 14px;
+    outline: none;
+    resize: none;
+    max-height: 120px;
+    transition: border-color 0.2s;
+  }
+  .input-box:focus { border-color: var(--accent); }
+  .input-actions { display: flex; gap: 8px; align-items: center; }
+  .input-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    cursor: pointer;
+    padding: 10px 12px;
+    font-size: 18px;
+    transition: all 0.15s;
+  }
+  .input-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .send-btn {
+    background: var(--accent);
+    color: #0d0d0f;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    padding: 10px 18px;
+    font-size: 18px;
+    transition: background 0.15s;
+  }
+  .send-btn:hover { background: var(--accent2); }
+  .media-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text2);
+  }
+  .media-preview .remove-btn {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 16px;
+    margin-left: auto;
+  }
+
+  /* ADMIN PANEL */
+  #screen-admin {
+    flex-direction: column;
+    padding: 0;
+  }
+  .admin-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .admin-header h1 { font-family: 'Playfair Display', serif; font-size: 26px; color: var(--accent); flex: 1; }
+  .admin-body { padding: 32px; overflow-y: auto; flex: 1; }
+  .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .admin-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .admin-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .admin-card-full { grid-column: 1 / -1; }
+  .table { width: 100%; border-collapse: collapse; }
+  .table th {
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .table tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .badge-open { background: rgba(76,175,125,0.15); color: var(--success); }
+  .badge-approval { background: rgba(201,168,76,0.15); color: var(--accent); }
+  .badge-invite { background: rgba(100,100,200,0.15); color: #9090e0; }
+  .badge-banned { background: rgba(224,85,85,0.15); color: var(--danger); }
+  .badge-pending { background: rgba(201,168,76,0.15); color: var(--accent); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h2 { font-family: 'Playfair Display', serif; font-size: 22px; margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+
+  /* INVITE LINK BOX */
+  .invite-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--accent);
+    word-break: break-all;
+    margin-top: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .invite-box:hover { border-color: var(--accent); }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 18px;
+    font-size: 14px;
+    color: var(--text);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* EMPTY STATE */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text2);
+    padding: 40px;
+    text-align: center;
+    flex: 1;
+  }
+  .empty-state .icon { font-size: 40px; }
+
+  /* SILENCED BANNER */
+  .silenced-banner {
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--accent);
+    margin: 12px 24px 0;
+  }
+
+  /* RULES BOX */
+  .rules-box {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.8;
+    margin: 12px 24px 0;
+    white-space: pre-line;
+  }
+
+  /* RECORDING */
+  .recording-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--danger);
+    font-size: 13px;
+    padding: 8px 12px;
+    background: rgba(224,85,85,0.1);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(224,85,85,0.2);
+  }
+  .rec-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--danger);
+    border-radius: 50%;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* MOBILE */
+  @media(max-width: 768px) {
+    .sidebar { width: 100%; min-width: unset; position: fixed; top: 0; left: -100%; transition: left 0.3s; z-index: 100; }
+    .sidebar.open { left: 0; }
+    .admin-grid { grid-template-columns: 1fr; }
+    .admin-card-full { grid-column: 1; }
+    .admin-body { padding: 20px; }
+  }
+
+  .no-select { user-select: none; }
+  input[type=file] { display: none; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- OFFLINE SCREEN -->
+<div id="screen-offline" class="screen">
+  <div class="offline-icon">🔇</div>
+  <div class="offline-title">Sistema Fora do Ar</div>
+  <p class="offline-msg" id="offline-msg">O sistema está temporariamente indisponível. Tente novamente mais tarde.</p>
+</div>
+
+<!-- ENTRY SCREEN -->
+<div id="screen-entry" class="screen">
+  <div class="entry-logo">Sussurros</div>
+  <p class="entry-tagline">Espaço anônimo de desabafo</p>
+  <div class="entry-card">
+    <h2>Bem-vindo(a)</h2>
+    <p>Você foi convidado(a). Escolha um codinome e entre no espaço.</p>
+    <div class="field">
+      <label>Codinome</label>
+      <input type="text" id="input-codename" placeholder="Ex: Pato Dourado" maxlength="30"/>
+    </div>
+    <div class="field">
+      <label>Seu telefone (ficará oculto dos outros)</label>
+      <input type="tel" id="input-phone" placeholder="(67) 99999-9999" maxlength="20"/>
+    </div>
+    <button class="btn btn-primary" onclick="enterApp()" id="btn-enter">Entrar nos Sussurros ✦</button>
+    <p id="entry-error" style="color:var(--danger);font-size:13px;margin-top:12px;display:none;"></p>
+  </div>
+</div>
+
+<!-- MAIN APP SCREEN -->
+<div id="screen-app" class="screen">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">Sussurros</div>
+      <div class="sidebar-user">
+        <div class="avatar" id="sidebar-avatar">?</div>
+        <div>
+          <div class="sidebar-user-name" id="sidebar-name">—</div>
+          <div class="sidebar-user-role" id="sidebar-role">Membro</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">Grupos</div>
+    <div id="groups-list" style="flex:1;overflow-y:auto;padding-bottom:8px;"></div>
+
+    <div class="sidebar-footer">
+      <button class="btn btn-ghost btn-sm" id="btn-admin-panel" onclick="openAdmin()" style="display:none;">⚙️ Painel Admin</button>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Sair</button>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-content">
+    <div id="chat-area" style="display:flex;flex-direction:column;height:100%;overflow:hidden;">
+      <!-- Preenchido dinamicamente -->
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN SCREEN -->
+<div id="screen-admin" class="screen">
+  <div class="admin-header">
+    <h1>⚙️ Painel de Administração</h1>
+    <button class="btn btn-ghost btn-sm" onclick="backToApp()">← Voltar</button>
+  </div>
+  <div class="admin-body">
+    <div class="admin-grid">
+
+      <!-- Sistema -->
+      <div class="admin-card">
+        <h3>🔌 Sistema</h3>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:13px;color:var(--text2);">Status:</span>
+            <span id="system-status-badge" class="badge badge-open">Online</span>
+          </div>
+          <button class="btn btn-danger btn-sm" id="btn-toggle-system" onclick="toggleSystem()">Tirar do Ar</button>
+          <div class="field" style="margin:0;">
+            <label>Mensagem offline</label>
+            <input type="text" id="offline-message-input" placeholder="Motivo ou mensagem..."/>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="saveOfflineMsg()">Salvar mensagem</button>
+        </div>
+      </div>
+
+      <!-- Criar grupo -->
+      <div class="admin-card">
+        <h3>➕ Criar Grupo</h3>
+        <div class="field">
+          <label>Nome do grupo</label>
+          <input type="text" id="new-group-name" placeholder="Ex: Gestão Financeira"/>
+        </div>
+        <div class="field">
+          <label>Descrição</label>
+          <input type="text" id="new-group-desc" placeholder="Breve descrição..."/>
+        </div>
+        <div class="field">
+          <label>Regras</label>
+          <textarea id="new-group-rules" placeholder="Uma regra por linha..."></textarea>
+        </div>
+        <div class="field">
+          <label>Tipo de acesso</label>
+          <select id="new-group-access">
+            <option value="open">🟢 Aberto — todos entram</option>
+            <option value="approval">🟡 Aprovação — admin aprova</option>
+            <option value="invite">🔵 Convite — só por convite</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="createGroup()">Criar Grupo</button>
+      </div>
+
+      <!-- Gerar convite -->
+      <div class="admin-card">
+        <h3>🔗 Gerar Link de Convite</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">Cada link é de uso único e vinculado ao dispositivo que acessar primeiro.</p>
+        <button class="btn btn-primary btn-sm" onclick="generateInvite()">Gerar Novo Link</button>
+        <div id="invite-result"></div>
+      </div>
+
+      <!-- Solicitações pendentes -->
+      <div class="admin-card">
+        <h3>🕐 Solicitações Pendentes</h3>
+        <div id="admin-requests">
+          <p style="font-size:13px;color:var(--text2);">Carregando...</p>
+        </div>
+      </div>
+
+      <!-- Usuários -->
+      <div class="admin-card admin-card-full">
+        <h3>👥 Usuários</h3>
+        <div id="admin-users">
+          <p style="font-size:13px;color:var(--text2);">Carregando...</p>
+        </div>
+      </div>
+
+      <!-- Grupos -->
+      <div class="admin-card admin-card-full">
+        <h3>💬 Grupos</h3>
+        <div id="admin-groups">
+          <p style="font-size:13px;color:var(--text2);">Carregando...</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GENÉRICO -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- HIDDEN INPUTS -->
+<input type="file" id="file-image" accept="image/*" onchange="handleFile(event,'image')"/>
+<input type="file" id="file-video" accept="video/*" onchange="handleFile(event,'video')"/>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const SUPABASE_URL = 'https://epmuzelcabfekfxemvjy.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwbXV6ZWxjYWJmZWtmeGVtdmp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDYwODEsImV4cCI6MjA5NDI4MjA4MX0.oQbwfcjLCNhz3qPWmwo8jXvsEuCQqjVKOaUwZwWLd04';
+const ADMIN_ID = '10c9d58b-9249-4730-8ee3-efa6e852def6';
+const FIRST_GROUP_ID = '5b8cbced-f12d-454c-aa02-3f8909b87422';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ============================================================
+// STATE
+// ============================================================
+let currentUser = null;
+let currentGroupId = null;
+let groups = [];
+let messagesChannel = null;
+let pendingMedia = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let systemOnline = true;
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  // Check system status
+  const { data: settings } = await sb.from('system_settings').select('*').eq('id', 1).single();
+  if (settings) {
+    systemOnline = settings.is_online;
+    if (!systemOnline) {
+      document.getElementById('offline-msg').textContent = settings.offline_message || 'Sistema temporariamente fora do ar.';
+      showScreen('offline');
+      return;
+    }
+  }
+
+  // Check stored session
+  const stored = localStorage.getItem('sussurros_user');
+  if (stored) {
+    try {
+      currentUser = JSON.parse(stored);
+      // Verify user still exists and not banned
+      const { data: u } = await sb.from('users').select('*').eq('id', currentUser.id).single();
+      if (!u || u.is_banned) {
+        localStorage.removeItem('sussurros_user');
+        checkInvite();
+        return;
+      }
+      currentUser = u;
+      localStorage.setItem('sussurros_user', JSON.stringify(u));
+      await startApp();
+      return;
+    } catch(e) {}
+  }
+
+  checkInvite();
+}
+
+function checkInvite() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('invite');
+  if (token) {
+    localStorage.setItem('invite_token', token);
+    showScreen('entry');
+  } else {
+    // No invite - check if already registered
+    const stored = localStorage.getItem('sussurros_user');
+    if (stored) {
+      showScreen('entry');
+    } else {
+      showScreen('offline'); // No invite, no session
+      document.getElementById('offline-msg').textContent = 'Acesso somente via link de convite.';
+    }
+  }
+}
+
+// ============================================================
+// DEVICE FINGERPRINT
+// ============================================================
+function getDeviceFingerprint() {
+  const nav = window.navigator;
+  const raw = [
+    nav.userAgent,
+    nav.language,
+    screen.width + 'x' + screen.height,
+    nav.hardwareConcurrency || '',
+    nav.platform || '',
+    Intl.DateTimeFormat().resolvedOptions().timeZone || ''
+  ].join('|');
+  // Simple hash
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+// ============================================================
+// ENTRY
+// ============================================================
+async function enterApp() {
+  const codename = document.getElementById('input-codename').value.trim();
+  const phone = document.getElementById('input-phone').value.trim();
+  const errEl = document.getElementById('entry-error');
+  errEl.style.display = 'none';
+
+  if (!codename || !phone) {
+    errEl.textContent = 'Preencha codinome e telefone.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btn-enter');
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+
+  const fingerprint = getDeviceFingerprint();
+  const inviteToken = localStorage.getItem('invite_token');
+
+  // If admin accessing directly
+  if (inviteToken === 'ADMIN_MASTER_TOKEN') {
+    // Admin direct access
+  } else if (inviteToken) {
+    // Validate invite
+    const { data: invite } = await sb.from('invite_links').select('*').eq('token', inviteToken).single();
+    if (!invite) {
+      errEl.textContent = 'Link de convite inválido.';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Entrar nos Sussurros ✦';
+      return;
+    }
+    if (invite.used && invite.device_fingerprint !== fingerprint) {
+      errEl.textContent = 'Este link já foi usado em outro dispositivo.';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Entrar nos Sussurros ✦';
+      return;
+    }
+  }
+
+  // Create or retrieve user by device fingerprint
+  const deviceToken = fingerprint + '_' + (inviteToken || 'direct');
+
+  let user = null;
+  const { data: existing } = await sb.from('users').select('*').eq('device_token', deviceToken).single();
+
+  if (existing) {
+    user = existing;
+    // Update name if changed
+    await sb.from('users').update({ codename, phone }).eq('id', existing.id);
+    user.codename = codename;
+  } else {
+    const { data: created, error } = await sb.from('users').insert({
+      device_token: deviceToken,
+      codename,
+      phone
+    }).select().single();
+    if (error || !created) {
+      errEl.textContent = 'Erro ao criar usuário. Tente novamente.';
+      errEl.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Entrar nos Sussurros ✦';
+      return;
+    }
+    user = created;
+
+    // Mark invite as used
+    if (inviteToken && inviteToken !== 'ADMIN_MASTER_TOKEN') {
+      await sb.from('invite_links').update({
+        used: true,
+        used_by: user.id,
+        device_fingerprint: fingerprint
+      }).eq('token', inviteToken);
+    }
+
+    // Auto-join open groups
+    const { data: openGroups } = await sb.from('groups').select('id').eq('access_type', 'open').eq('is_active', true);
+    if (openGroups) {
+      for (const g of openGroups) {
+        await sb.from('group_members').upsert({ group_id: g.id, user_id: user.id, status: 'approved' });
+      }
+    }
+  }
+
+  currentUser = user;
+  localStorage.setItem('sussurros_user', JSON.stringify(user));
+  await startApp();
+}
+
+// ============================================================
+// START APP
+// ============================================================
+async function startApp() {
+  showScreen('app');
+
+  // Set sidebar info
+  document.getElementById('sidebar-name').textContent = currentUser.codename;
+  document.getElementById('sidebar-avatar').textContent = currentUser.codename[0].toUpperCase();
+  const isAdmin = currentUser.id === ADMIN_ID;
+  document.getElementById('sidebar-role').textContent = isAdmin ? 'Admin' : 'Membro';
+  if (isAdmin) {
+    document.getElementById('btn-admin-panel').style.display = 'block';
+    document.getElementById('sidebar-role').style.color = 'var(--accent)';
+  }
+
+  await loadGroups();
+  subscribeRealtime();
+}
+
+// ============================================================
+// GROUPS
+// ============================================================
+async function loadGroups() {
+  const { data: allGroups } = await sb.from('groups').select('*').eq('is_active', true).order('created_at');
+  if (!allGroups) return;
+  groups = allGroups;
+
+  const { data: memberships } = await sb.from('group_members')
+    .select('group_id, status')
+    .eq('user_id', currentUser.id);
+
+  const memberMap = {};
+  if (memberships) memberships.forEach(m => memberMap[m.group_id] = m.status);
+
+  const list = document.getElementById('groups-list');
+  list.innerHTML = '';
+
+  for (const g of allGroups) {
+    const status = memberMap[g.id];
+    const isAdmin = currentUser.id === ADMIN_ID;
+    const canSee = isAdmin || status === 'approved' || g.access_type !== 'invite';
+
+    if (!canSee) continue;
+
+    const icon = g.access_type === 'open' ? '💬' : g.access_type === 'approval' ? '🔐' : '🔒';
+    const div = document.createElement('div');
+    div.className = 'group-item' + (currentGroupId === g.id ? ' active' : '');
+    div.setAttribute('data-id', g.id);
+    div.innerHTML = `
+      <span class="group-item-icon">${icon}</span>
+      <span class="group-item-name">${g.name}</span>
+      ${status === 'pending' ? '<span class="group-item-badge">Pendente</span>' : ''}
+    `;
+    div.onclick = () => openGroup(g.id);
+    list.appendChild(div);
+  }
+
+  // Open first group if none selected
+  if (!currentGroupId && allGroups.length > 0) {
+    openGroup(FIRST_GROUP_ID || allGroups[0].id);
+  }
+}
+
+async function openGroup(groupId) {
+  currentGroupId = groupId;
+
+  // Update active state
+  document.querySelectorAll('.group-item').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-id') === groupId);
+  });
+
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return;
+
+  const isAdmin = currentUser.id === ADMIN_ID;
+
+  // Check membership
+  const { data: membership } = await sb.from('group_members')
+    .select('status')
+    .eq('group_id', groupId)
+    .eq('user_id', currentUser.id)
+    .single();
+
+  const status = membership?.status;
+  const isMember = isAdmin || status === 'approved';
+
+  const chatArea = document.getElementById('chat-area');
+  chatArea.innerHTML = '';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'chat-header';
+  header.innerHTML = `
+    <div class="chat-header-info">
+      <div class="chat-header-name">${group.name}</div>
+      <div class="chat-header-desc">${group.description || ''}</div>
+    </div>
+  `;
+  chatArea.appendChild(header);
+
+  // Rules
+  if (group.rules) {
+    const rulesEl = document.createElement('div');
+    rulesEl.className = 'rules-box';
+    rulesEl.innerHTML = '📋 <strong>Regras:</strong> ' + group.rules.replace(/\\n/g, '\n');
+    chatArea.appendChild(rulesEl);
+  }
+
+  // Silenced banner
+  if (currentUser.is_silenced && !isAdmin) {
+    const banner = document.createElement('div');
+    banner.className = 'silenced-banner';
+    banner.textContent = '⚠️ Você está silenciado(a). Não pode enviar mensagens temporariamente.';
+    chatArea.appendChild(banner);
+  }
+
+  if (!isMember) {
+    // Show join options
+    const pending = document.createElement('div');
+    pending.className = 'pending-box';
+
+    if (status === 'pending') {
+      pending.innerHTML = `
+        <div class="icon">⏳</div>
+        <h3>Aguardando aprovação</h3>
+        <p style="color:var(--text2);font-size:14px;">Sua solicitação está sendo analisada pelo administrador.</p>
+      `;
+    } else if (group.access_type === 'invite') {
+      pending.innerHTML = `
+        <div class="icon">🔒</div>
+        <h3>Grupo restrito</h3>
+        <p style="color:var(--text2);font-size:14px;">Este grupo é acessível apenas por convite direto do admin.</p>
+      `;
+    } else {
+      pending.innerHTML = `
+        <div class="icon">🔐</div>
+        <h3>${group.name}</h3>
+        <p style="color:var(--text2);font-size:14px;">Este grupo requer aprovação para participar.</p>
+        <button class="btn btn-primary btn-sm" onclick="requestJoin('${groupId}')">Solicitar Entrada</button>
+      `;
+    }
+    chatArea.appendChild(pending);
+    return;
+  }
+
+  // Messages area
+  const msgsArea = document.createElement('div');
+  msgsArea.className = 'messages-area';
+  msgsArea.id = 'messages-area';
+  chatArea.appendChild(msgsArea);
+
+  // Input area
+  if (!currentUser.is_silenced || isAdmin) {
+    const inputArea = document.createElement('div');
+    inputArea.className = 'input-area';
+    inputArea.id = 'input-area';
+    inputArea.innerHTML = `
+      <div id="media-preview-row"></div>
+      <div class="input-row">
+        <button class="input-btn" title="Foto" onclick="document.getElementById('file-image').click()">📷</button>
+        <button class="input-btn" title="Vídeo" onclick="document.getElementById('file-video').click()">🎬</button>
+        <button class="input-btn" id="audio-btn" title="Gravar áudio" onclick="toggleRecording()">🎙️</button>
+        <textarea class="input-box" id="msg-input" placeholder="Digite sua mensagem..." rows="1" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" onclick="sendMessage()">➤</button>
+      </div>
+    `;
+    chatArea.appendChild(inputArea);
+  }
+
+  await loadMessages(groupId);
+  subscribeMessages(groupId);
+}
+
+async function loadMessages(groupId) {
+  const { data: msgs } = await sb.from('messages')
+    .select('*, users(codename)')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: true });
+
+  const area = document.getElementById('messages-area');
+  if (!area) return;
+  area.innerHTML = '';
+
+  if (!msgs || msgs.length === 0) {
+    area.innerHTML = `<div class="empty-state"><div class="icon">💭</div><p>Nenhuma mensagem ainda. Seja o(a) primeiro(a)!</p></div>`;
+    return;
+  }
+
+  for (const msg of msgs) {
+    renderMessage(msg, area);
+  }
+  area.scrollTop = area.scrollHeight;
+}
+
+function renderMessage(msg, area) {
+  if (!area) area = document.getElementById('messages-area');
+  if (!area) return;
+
+  const isOwn = msg.user_id === currentUser.id;
+  const isAdmin = currentUser.id === ADMIN_ID;
+  const time = new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  const div = document.createElement('div');
+  div.className = 'message' + (isOwn ? ' own' : '');
+  div.id = 'msg-' + msg.id;
+
+  const codename = msg.users?.codename || 'Anônimo';
+  const initial = codename[0].toUpperCase();
+
+  let content = '';
+  if (msg.is_deleted) {
+    content = '<span class="message-deleted">🚫 Mensagem removida</span>';
+  } else {
+    if (msg.media_type === 'image' && msg.media_url) {
+      content = `<div class="message-media"><img src="${msg.media_url}" onclick="openImage('${msg.media_url}')" loading="lazy"/></div>`;
+    } else if (msg.media_type === 'video' && msg.media_url) {
+      content = `<div class="message-media"><video controls src="${msg.media_url}"></video></div>`;
+    } else if (msg.media_type === 'audio' && msg.media_url) {
+      content = `<div class="message-media"><audio controls src="${msg.media_url}"></audio></div>`;
+    }
+    if (msg.content) {
+      content += `<div class="message-text">${escapeHtml(msg.content)}</div>`;
+    }
+  }
+
+  const deleteBtn = isAdmin && !msg.is_deleted
+    ? `<button class="admin-delete-btn" onclick="deleteMessage('${msg.id}')" title="Remover">✕</button>`
+    : '';
+
+  div.innerHTML = `
+    <div class="message-avatar"><div class="avatar">${initial}</div></div>
+    <div class="message-bubble">
+      <div class="message-name">${escapeHtml(codename)} ${deleteBtn}</div>
+      ${content}
+      <div class="message-time">${time}</div>
+    </div>
+  `;
+
+  area.appendChild(div);
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msg-input');
+  const text = input?.value.trim() || '';
+
+  if (!text && !pendingMedia) return;
+  if (!currentGroupId) return;
+
+  let mediaUrl = null;
+  let mediaType = 'text';
+
+  if (pendingMedia) {
+    // Upload file
+    const ext = pendingMedia.file.name.split('.').pop();
+    const path = `${currentUser.id}/${Date.now()}.${ext}`;
+    const { data: uploaded, error } = await sb.storage.from('media').upload(path, pendingMedia.file, { upsert: true });
+    if (!error) {
+      const { data: pub } = sb.storage.from('media').getPublicUrl(path);
+      mediaUrl = pub.publicUrl;
+      mediaType = pendingMedia.type;
+    }
+    clearMedia();
+  }
+
+  const { error } = await sb.from('messages').insert({
+    group_id: currentGroupId,
+    user_id: currentUser.id,
+    content: text || null,
+    media_url: mediaUrl,
+    media_type: mediaType
+  });
+
+  if (!error && input) input.value = '';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+async function deleteMessage(msgId) {
+  await sb.from('messages').update({ is_deleted: true }).eq('id', msgId);
+  const el = document.getElementById('msg-' + msgId);
+  if (el) {
+    el.querySelector('.message-bubble').innerHTML = '<span class="message-deleted">🚫 Mensagem removida</span>';
+  }
+  toast('Mensagem removida.');
+}
+
+async function requestJoin(groupId) {
+  await sb.from('group_requests').upsert({
+    group_id: groupId,
+    user_id: currentUser.id,
+    status: 'pending'
+  });
+  await sb.from('group_members').upsert({
+    group_id: groupId,
+    user_id: currentUser.id,
+    status: 'pending'
+  });
+  toast('Solicitação enviada! Aguarde aprovação.');
+  await openGroup(groupId);
+}
+
+// ============================================================
+// REALTIME
+// ============================================================
+function subscribeRealtime() {
+  // System settings changes
+  sb.channel('system').on('postgres_changes', {
+    event: 'UPDATE', schema: 'public', table: 'system_settings'
+  }, payload => {
+    if (!payload.new.is_online && currentUser.id !== ADMIN_ID) {
+      document.getElementById('offline-msg').textContent = payload.new.offline_message;
+      showScreen('offline');
+    }
+  }).subscribe();
+}
+
+let currentMsgChannel = null;
+function subscribeMessages(groupId) {
+  if (currentMsgChannel) sb.removeChannel(currentMsgChannel);
+  currentMsgChannel = sb.channel('messages-' + groupId)
+    .on('postgres_changes', {
+      event: 'INSERT', schema: 'public', table: 'messages', filter: `group_id=eq.${groupId}`
+    }, async payload => {
+      const { data: msg } = await sb.from('messages').select('*, users(codename)').eq('id', payload.new.id).single();
+      const area = document.getElementById('messages-area');
+      if (area) {
+        // Remove empty state if present
+        const empty = area.querySelector('.empty-state');
+        if (empty) empty.remove();
+        renderMessage(msg, area);
+        area.scrollTop = area.scrollHeight;
+      }
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE', schema: 'public', table: 'messages', filter: `group_id=eq.${groupId}`
+    }, payload => {
+      const el = document.getElementById('msg-' + payload.new.id);
+      if (el && payload.new.is_deleted) {
+        el.querySelector('.message-bubble').innerHTML = '<span class="message-deleted">🚫 Mensagem removida</span>';
+      }
+    })
+    .subscribe();
+}
+
+// ============================================================
+// MEDIA
+// ============================================================
+function handleFile(event, type) {
+  const file = event.target.files[0];
+  if (!file) return;
+  pendingMedia = { file, type };
+  const row = document.getElementById('media-preview-row');
+  if (row) {
+    row.innerHTML = `
+      <div class="media-preview">
+        <span>${type === 'image' ? '📷' : '🎬'} ${file.name}</span>
+        <button class="remove-btn" onclick="clearMedia()">✕</button>
+      </div>
+    `;
+  }
+  event.target.value = '';
+}
+
+function clearMedia() {
+  pendingMedia = null;
+  const row = document.getElementById('media-preview-row');
+  if (row) row.innerHTML = '';
+}
+
+async function toggleRecording() {
+  if (isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    document.getElementById('audio-btn').textContent = '🎙️';
+    const row = document.getElementById('media-preview-row');
+    if (row) row.innerHTML = '';
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const file = new File([blob], `audio_${Date.now()}.webm`, { type: 'audio/webm' });
+      pendingMedia = { file, type: 'audio' };
+      const row = document.getElementById('media-preview-row');
+      if (row) {
+        row.innerHTML = `
+          <div class="media-preview">
+            <span>🎙️ Áudio gravado (${(blob.size/1024).toFixed(1)} KB)</span>
+            <button class="remove-btn" onclick="clearMedia()">✕</button>
+          </div>
+        `;
+      }
+      stream.getTracks().forEach(t => t.stop());
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    document.getElementById('audio-btn').textContent = '⏹️';
+    const row = document.getElementById('media-preview-row');
+    if (row) row.innerHTML = '<div class="recording-indicator"><div class="rec-dot"></div> Gravando áudio... clique ⏹️ para parar</div>';
+  } catch(e) {
+    toast('Erro ao acessar microfone.');
+  }
+}
+
+function openImage(url) {
+  showModal(`<h2>📷 Imagem</h2><img src="${url}" style="width:100%;border-radius:8px;margin-top:12px;"/>`);
+}
+
+// ============================================================
+// ADMIN PANEL
+// ============================================================
+async function openAdmin() {
+  if (currentUser.id !== ADMIN_ID) return;
+  showScreen('admin');
+  await loadAdminData();
+}
+
+async function loadAdminData() {
+  // System status
+  const { data: settings } = await sb.from('system_settings').select('*').eq('id', 1).single();
+  if (settings) {
+    document.getElementById('system-status-badge').textContent = settings.is_online ? 'Online' : 'Offline';
+    document.getElementById('system-status-badge').className = 'badge ' + (settings.is_online ? 'badge-open' : 'badge-banned');
+    document.getElementById('btn-toggle-system').textContent = settings.is_online ? 'Tirar do Ar' : 'Colocar Online';
+    document.getElementById('offline-message-input').value = settings.offline_message || '';
+    systemOnline = settings.is_online;
+  }
+
+  // Users
+  const { data: users } = await sb.from('users').select('*').order('created_at');
+  const usersDiv = document.getElementById('admin-users');
+  if (users && users.length > 0) {
+    usersDiv.innerHTML = `
+      <table class="table">
+        <thead><tr><th>Codinome</th><th>Entrou em</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>
+          ${users.map(u => `
+            <tr>
+              <td>${escapeHtml(u.codename)}</td>
+              <td>${new Date(u.created_at).toLocaleDateString('pt-BR')}</td>
+              <td>
+                ${u.is_banned ? '<span class="badge badge-banned">Banido</span>' : ''}
+                ${u.is_silenced ? '<span class="badge badge-pending">Silenciado</span>' : ''}
+                ${!u.is_banned && !u.is_silenced ? '<span class="badge badge-open">Normal</span>' : ''}
+              </td>
+              <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                ${u.id !== ADMIN_ID ? `
+                  <button class="btn btn-ghost btn-sm" onclick="toggleSilence('${u.id}', ${u.is_silenced})">${u.is_silenced ? 'Dessilenciar' : 'Silenciar'}</button>
+                  <button class="btn btn-danger btn-sm" onclick="toggleBan('${u.id}', ${u.is_banned})">${u.is_banned ? 'Desbanir' : 'Banir'}</button>
+                  <button class="btn btn-ghost btn-sm" onclick="removeUser('${u.id}')">Remover</button>
+                ` : '<span style="color:var(--text3);font-size:12px;">Admin</span>'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    usersDiv.innerHTML = '<p style="font-size:13px;color:var(--text2);">Nenhum usuário cadastrado.</p>';
+  }
+
+  // Pending requests
+  const { data: reqs } = await sb.from('group_requests')
+    .select('*, users(codename), groups(name)')
+    .eq('status', 'pending');
+  const reqsDiv = document.getElementById('admin-requests');
+  if (reqs && reqs.length > 0) {
+    reqsDiv.innerHTML = reqs.map(r => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;">
+          <div style="font-size:14px;">${escapeHtml(r.users?.codename || '?')}</div>
+          <div style="font-size:12px;color:var(--text2);">→ ${escapeHtml(r.groups?.name || '?')}</div>
+        </div>
+        <button class="btn btn-success btn-sm" onclick="handleRequest('${r.id}','${r.group_id}','${r.user_id}','approved')">✓ Aprovar</button>
+        <button class="btn btn-danger btn-sm" onclick="handleRequest('${r.id}','${r.group_id}','${r.user_id}','denied')">✕ Negar</button>
+      </div>
+    `).join('');
+  } else {
+    reqsDiv.innerHTML = '<p style="font-size:13px;color:var(--text2);">Nenhuma solicitação pendente.</p>';
+  }
+
+  // Groups
+  const { data: grps } = await sb.from('groups').select('*').order('created_at');
+  const grpsDiv = document.getElementById('admin-groups');
+  if (grps && grps.length > 0) {
+    grpsDiv.innerHTML = `
+      <table class="table">
+        <thead><tr><th>Nome</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead>
+        <tbody>
+          ${grps.map(g => `
+            <tr>
+              <td>${escapeHtml(g.name)}</td>
+              <td><span class="badge badge-${g.access_type}">${g.access_type === 'open' ? 'Aberto' : g.access_type === 'approval' ? 'Aprovação' : 'Convite'}</span></td>
+              <td><span class="badge ${g.is_active ? 'badge-open' : 'badge-banned'}">${g.is_active ? 'Ativo' : 'Inativo'}</span></td>
+              <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" onclick="toggleGroup('${g.id}', ${g.is_active})">${g.is_active ? 'Desativar' : 'Ativar'}</button>
+                <button class="btn btn-ghost btn-sm" onclick="editGroupAccess('${g.id}', '${g.access_type}')">Editar Acesso</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteGroup('${g.id}')">Excluir</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }
+}
+
+async function toggleSystem() {
+  const { data: s } = await sb.from('system_settings').select('is_online').eq('id', 1).single();
+  const newStatus = !s.is_online;
+  await sb.from('system_settings').update({ is_online: newStatus }).eq('id', 1);
+  toast(newStatus ? 'Sistema colocado online!' : 'Sistema retirado do ar!');
+  await loadAdminData();
+}
+
+async function saveOfflineMsg() {
+  const msg = document.getElementById('offline-message-input').value;
+  await sb.from('system_settings').update({ offline_message: msg }).eq('id', 1);
+  toast('Mensagem salva!');
+}
+
+async function createGroup() {
+  const name = document.getElementById('new-group-name').value.trim();
+  const desc = document.getElementById('new-group-desc').value.trim();
+  const rules = document.getElementById('new-group-rules').value.trim();
+  const access = document.getElementById('new-group-access').value;
+  if (!name) { toast('Digite o nome do grupo.'); return; }
+
+  const { data: g, error } = await sb.from('groups').insert({ name, description: desc, rules, access_type: access }).select().single();
+  if (!error) {
+    toast('Grupo criado!');
+    document.getElementById('new-group-name').value = '';
+    document.getElementById('new-group-desc').value = '';
+    document.getElementById('new-group-rules').value = '';
+    await loadAdminData();
+    await loadGroups();
+  }
+}
+
+async function generateInvite() {
+  const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+  await sb.from('invite_links').insert({ token });
+  const link = window.location.origin + window.location.pathname + '?invite=' + token;
+  const result = document.getElementById('invite-result');
+  result.innerHTML = `
+    <p style="font-size:12px;color:var(--text2);margin-top:12px;">Clique para copiar:</p>
+    <div class="invite-box" onclick="copyText('${link}', this)">${link}</div>
+    <p style="font-size:11px;color:var(--text3);margin-top:6px;">⚠️ Este link só funciona uma vez e fica vinculado ao dispositivo que acessar primeiro.</p>
+  `;
+}
+
+function copyText(text, el) {
+  navigator.clipboard.writeText(text).then(() => {
+    toast('Link copiado!');
+    if (el) { const orig = el.textContent; el.textContent = '✓ Copiado!'; setTimeout(() => el.textContent = orig, 1500); }
+  });
+}
+
+async function handleRequest(reqId, groupId, userId, status) {
+  await sb.from('group_requests').update({ status }).eq('id', reqId);
+  await sb.from('group_members').upsert({ group_id: groupId, user_id: userId, status: status === 'approved' ? 'approved' : 'banned' });
+  toast(status === 'approved' ? 'Usuário aprovado!' : 'Solicitação negada.');
+  await loadAdminData();
+}
+
+async function toggleSilence(userId, current) {
+  await sb.from('users').update({ is_silenced: !current }).eq('id', userId);
+  toast(!current ? 'Usuário silenciado.' : 'Silêncio removido.');
+  await loadAdminData();
+}
+
+async function toggleBan(userId, current) {
+  await sb.from('users').update({ is_banned: !current }).eq('id', userId);
+  toast(!current ? 'Usuário banido.' : 'Usuário desbanido.');
+  await loadAdminData();
+}
+
+async function removeUser(userId) {
+  if (!confirm('Remover este usuário permanentemente?')) return;
+  await sb.from('group_members').delete().eq('user_id', userId);
+  await sb.from('users').delete().eq('id', userId);
+  toast('Usuário removido.');
+  await loadAdminData();
+}
+
+async function toggleGroup(groupId, current) {
+  await sb.from('groups').update({ is_active: !current }).eq('id', groupId);
+  toast(!current ? 'Grupo ativado.' : 'Grupo desativado.');
+  await loadAdminData();
+  await loadGroups();
+}
+
+async function editGroupAccess(groupId, currentAccess) {
+  showModal(`
+    <h2>Editar Acesso do Grupo</h2>
+    <div class="field">
+      <label>Tipo de acesso</label>
+      <select id="edit-access-select">
+        <option value="open" ${currentAccess==='open'?'selected':''}>🟢 Aberto</option>
+        <option value="approval" ${currentAccess==='approval'?'selected':''}>🟡 Aprovação</option>
+        <option value="invite" ${currentAccess==='invite'?'selected':''}>🔵 Convite</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveGroupAccess('${groupId}')">Salvar</button>
+    </div>
+  `);
+}
+
+async function saveGroupAccess(groupId) {
+  const access = document.getElementById('edit-access-select').value;
+  await sb.from('groups').update({ access_type: access }).eq('id', groupId);
+  closeModal();
+  toast('Acesso atualizado!');
+  await loadAdminData();
+  await loadGroups();
+}
+
+async function deleteGroup(groupId) {
+  if (!confirm('Excluir este grupo e todas as mensagens?')) return;
+  await sb.from('messages').delete().eq('group_id', groupId);
+  await sb.from('group_members').delete().eq('group_id', groupId);
+  await sb.from('group_requests').delete().eq('group_id', groupId);
+  await sb.from('groups').delete().eq('id', groupId);
+  toast('Grupo excluído.');
+  await loadAdminData();
+  await loadGroups();
+}
+
+function backToApp() {
+  showScreen('app');
+  loadGroups();
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+function showModal(html) {
+  document.getElementById('modal-content').innerHTML = html;
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function closeModal(e) {
+  if (!e || e.target === document.getElementById('modal-overlay')) {
+    document.getElementById('modal-overlay').classList.remove('active');
+  }
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function logout() {
+  localStorage.removeItem('sussurros_user');
+  localStorage.removeItem('invite_token');
+  currentUser = null;
+  currentGroupId = null;
+  location.reload();
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+init();
+</script>
+</body>
+</html>
