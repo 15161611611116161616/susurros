@@ -789,7 +789,7 @@ async function openGroup(gid){
   // Área de mensagens
   const ma=document.createElement('div');ma.className='msgs-area';ma.id='msgs-area';ca.appendChild(ma);
   // Input (apenas se não bloqueado ou se for admin)
-  if(!me.is_silenced||adm){
+  if(true){
     const inp=document.createElement('div');inp.className='inp-area';inp.id='inp-area';
     inp.innerHTML=`<div id="reply-row"></div><div id="media-row"></div><div class="inp-row"><button class="ibtn" onclick="document.getElementById('f-img').click()">📷</button><button class="ibtn" onclick="document.getElementById('f-vid').click()">🎬</button><button class="ibtn" id="rec-btn" onclick="toggleRec()">🎙️</button><textarea class="inp-box" id="msg-box" placeholder="Digite sua mensagem..." rows="1" onkeydown="handleKey(event)"></textarea><button class="send-btn" onclick="sendMsg()">➤</button></div>`;
     ca.appendChild(inp);
