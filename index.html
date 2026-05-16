@@ -521,7 +521,28 @@ async function init(){
   if(stored){try{const u=JSON.parse(stored);const{data:fresh}=await sb.from('users').select('*').eq('id',u.id).single();if(!fresh||fresh.is_banned){localStorage.removeItem('weall_v1');checkInvite();return;}me=fresh;localStorage.setItem('weall_v1',JSON.stringify(fresh));await startApp();return;}catch(e){}}
   checkInvite();
 }
-function checkInvite(){const t=new URLSearchParams(window.location.search).get('invite');if(t){localStorage.setItem('inv',t);showScreen('entry');}else{showScreen('offline');setEl('offline-msg','Acesso somente via link de convite.');}}
+function checkInvite(){
+  const t=new URLSearchParams(window.location.search).get('invite');
+  if(t){localStorage.setItem('inv',t);showScreen('entry');return;}
+  // APK ou acesso direto — mostra campo para digitar token
+  showScreen('offline');
+  document.getElementById('offline-msg').innerHTML=`
+    <span>Digite o codigo de acesso recebido:</span>
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px;">
+      <input type="text" id="manual-token" placeholder="Cole o codigo aqui..." 
+        style="width:100%;background:#1a1a28;border:1px solid #2a2a40;border-radius:9px;color:#eeeef5;font-size:14px;padding:11px 13px;outline:none;text-align:center;"/>
+      <button onclick="useManualToken()" 
+        style="background:linear-gradient(135deg,#7c6af7,#5a4fd4);color:#fff;border:none;border-radius:9px;padding:12px;font-size:14px;font-weight:500;cursor:pointer;width:100%;">
+        Entrar no WeAll ✦
+      </button>
+    </div>`;
+}
+function useManualToken(){
+  const t=document.getElementById('manual-token')?.value.trim();
+  if(!t){return;}
+  localStorage.setItem('inv',t);
+  showScreen('entry');
+}
 
 /* [ENTRY] */
 function prevEntryAv(e){const f=e.target.files[0];if(!f)return;entryAvFile=f;const r=new FileReader();r.onload=ev=>{document.getElementById('entry-av').innerHTML=`<img src="${ev.target.result}"/>`;};r.readAsDataURL(f);}
