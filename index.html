@@ -313,18 +313,35 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
 <div id="screen-entry" class="screen">
   <div class="e-logo-wrap">
     <div class="e-logo">WeAll</div>
-    <div class="e-tag">Segurança máxima & Privacidade</div>
+    <div class="e-tag">Versão 1.0 — Acesso Direto</div>
   </div>
+  
   <div class="e-card">
-    <div id="step-phone" class="sms-step active">
-      <h2>Entrar no App</h2>
-      <div class="dev-note">Insira seu número de telefone com o DDD. Você receberá um código de confirmação por SMS.</div>
-      <div class="field">
-        <label>Telefone</label>
-        <div style="display:flex;gap:6px;">
-          <input type="tel" id="input-phone" placeholder="(67) 99999-9999" value=""/>
-        </div>
+    <h2>Bem-vindo</h2>
+    <p class="dev-note">Insira seus dados para acessar o aplicativo instantaneamente.</p>
+    
+    <div class="av-wrap">
+      <div class="av-pick" id="login-avatar-btn" onclick="captureProfilePhoto()">
+        <span id="avatar-placeholder">👤</span>
       </div>
+      <label style="font-size:11px; color:var(--tx2); cursor:pointer;" onclick="captureProfilePhoto()">Definir foto de perfil</label>
+    </div>
+
+    <div class="field">
+      <label>Seu Codinome</label>
+      <input type="text" id="login-username" placeholder="Ex: Alex_99" autocomplete="off" required />
+    </div>
+
+    <div class="field">
+      <label>Seu Número de Telefone</label>
+      <input type="tel" id="login-phone" placeholder="Ex: 67999999999" autocomplete="off" required />
+    </div>
+
+    <button class="btn btn-p" id="btn-entrar-direto" onclick="handleDirectLogin()" style="margin-top: 10px;">
+      Entrar no Aplicativo
+    </button>
+  </div>
+</div>
       <div id="recaptcha-container"></div>
       <button class="btn btn-p" id="btn-send-sms" onclick="sendSMSCode()">Enviar Código</button>
     </div>
