@@ -345,22 +345,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
       <div id="recaptcha-container"></div>
       <button class="btn btn-p" id="btn-send-sms" onclick="sendSMSCode()">Enviar Código</button>
     </div>
-
-    <div id="step-verify" class="sms-step">
-      <h2>Verificar Código</h2>
-      <div class="dev-note">Insira o código de 6 dígitos enviado para seu telefone.</div>
-      <div class="otp-inputs">
-        <input type="text" maxlength="1" class="otp-input" oninput="moveOtp(this, 1)"/>
-        <input type="text" maxlength="1" class="otp-input" oninput="moveOtp(this, 2)"/>
-        <input type="text" maxlength="1" class="otp-input" oninput="moveOtp(this, 3)"/>
-        <input type="text" maxlength="1" class="otp-input" oninput="moveOtp(this, 4)"/>
-        <input type="text" maxlength="1" class="otp-input" oninput="moveOtp(this, 5)"/>
-        <input type="text" maxlength="1" class="otp-input" oninput="moveOtp(this, 6)"/>
-      </div>
-      <button class="btn btn-p" id="btn-verify-otp" onclick="verifySMSCode()">Confirmar Código</button>
-      <button class="btn btn-g btn-sm" style="width:100%;margin-top:10px;" onclick="changePhoneStep(true)">Alterar Número</button>
-    </div>
-
+  
     <div id="step-profile" class="sms-step">
       <h2>Configurar Perfil</h2>
       <div class="dev-note">Defina seu Codename único. Suas interações são protegidas.</div>
@@ -649,33 +634,94 @@ function moveOtp(input, index) {
   }
 }
 
-async function verifySMSCode() {
-  const inputs = document.querySelectorAll('.otp-input');
-  let code = "";
-  inputs.forEach(i => code += i.value);
-  
-  if(code.length < 6) return toast("Insira o código completo.");
-  
-  const btn = document.getElementById('btn-verify-otp');
-  btn.disabled = true;
-  
+// ==========================================
+// NOVA LÓGICA DE LOGIN DIRETO (SEM SMS)
+// ==========================================
+async function handleDirectLogin() {
+  const usernameEl = document.getElementById('login-username');
+  const phoneEl = document.getElementById('login-phone');
+  const btnEntrar = document.getElementById('btn-entrar-direto');
+
+  const username = usernameEl ? usernameEl.value.trim() : '';
+  let phone = phoneEl ? phoneEl.value.trim() : '';
+
+  if (!username || !phone) {
+    toast("Por favor, preencha todos os campos!");
+    return;
+  }
+
+  // Desativa o botão para evitar cliques duplicados
+  btnEntrar.disabled = true;
+  btnEntrar.textContent = "Acessando...";
+
+  // Limpa e formata o telefone para o padrão internacional (+55...)
+  phone = phone.replace(/\D/g, '');
+  if (!phone.startsWith('55')) {
+    phone = '55' + phone;
+  }
+  const formattedPhone = '+' + phone;
+
   try {
-    const result = await confirmationResult.confirm(code);
-    const firebaseUser = result.user;
-    
-    const { data: profile, error } = await sb.from('users').select('*').eq('phone', firebaseUser.phoneNumber).single();
-    
-    if (profile) {
-      me = profile;
-      localStorage.setItem('weall_v2', JSON.stringify(me));
-      initApp();
-    } else {
-      document.getElementById('step-verify').classList.remove('active');
-      document.getElementById('step-profile').classList.add('active');
+    // Cria um ID único simulado baseado no timestamp para o novo usuário
+    // Caso o usuário já exista no Supabase, a lógica de sincronização do WeAll o identificará pelo telefone
+    const generatedId = 'usr_' + Date.now();
+
+    // Monta o objeto de sessão igual ao que o WeAll v7.0 espera
+    const sessionData = {
+      id: generatedId,
+      username: username,
+      phone: formattedPhone,
+      avatar_url: window.uploadedAvatarUrl || '', // Resgata a foto da câmera/upload se houver
+      role: 'user',
+      created_at: new Date().toISOString()
+    };
+
+    // Sincronização opcional com o Supabase (Tabela de Usuários se o app usar)
+    if (typeof sb !== 'undefined') {
+      // Verifica se o número já existe cadastrado no banco para não duplicar perfis
+      const { data: existingUser } = await sb.from('users').select('*').eq('phone', formattedPhone).maybeSingle();
+      
+      if (existingUser) {
+        // Se já existe, reaproveita o ID e dados antigos
+        sessionData.id = existingUser.id;
+        sessionData.role = existingUser.role || 'user';
+      } else {
+        // Se for novo, salva na tabela de usuários do banco
+        await sb.from('users').insert([{
+          id: sessionData.id,
+          username: sessionData.username,
+          phone: sessionData.phone,
+          avatar_url: sessionData.avatar_url,
+          role: 'user'
+        }]);
+      }
     }
+
+    // Salva no localStorage na chave original do sistema (weall_v2)
+    localStorage.setItem('weall_v2', JSON.stringify(sessionData));
+    
+    // Define a variável global do usuário atual usada no restante do app
+    window.me = sessionData; 
+
+    toast("Acesso autorizado!");
+
+    // Esconde a tela de login e inicia a aplicação principal
+    setTimeout(() => {
+      if (typeof initApp === 'function') {
+        initApp();
+      } else if (typeof startApp === 'function') {
+        startApp();
+      } else {
+        // Fallback caso a função tenha outro nome: recarrega a página autenticado
+        location.reload();
+      }
+    }, 1200);
+
   } catch (error) {
-    toast("Código incorreto ou expirado.");
-    btn.disabled = false;
+    console.error("Erro no login direto:", error);
+    toast("Erro ao conectar. Tente novamente.");
+    btnEntrar.disabled = false;
+    btnEntrar.textContent = "Entrar no Aplicativo";
   }
 }
 
